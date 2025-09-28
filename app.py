@@ -1,21 +1,23 @@
-# app.py
-import dash
-from dash import html
-from flask import Flask
+from flask import Flask, request, jsonify
 
-# Create the Flask server
-server = Flask(__name__)
+app = Flask(__name__)
 
-# Add a simple endpoint
-@server.route("/hello", methods=["GET"])
-def hello():
-    return "hello world"
+# logging endpoint
+@app.route("/log", methods=["GET"])
+def log():
+    value = request.args.get("value")
 
-# Wrap it with Dash (optional UI at "/")
-app = dash.Dash(__name__, server=server, routes_pathname_prefix="/")
-app.layout = html.Div("Hello from Dash root!")
+    print(f"Data received: {value}")  # server-side logging
+    return jsonify({"status": "ok", "value": value})
+
+
+# inspeection output
+@app.route("/print", methods=["GET"])
+def print_msg():
+    print("This is a test message!")
+    return "Printed message on server console!"
+
 
 if __name__ == "__main__":
-    # Render expects your app to listen on 0.0.0.0 and a port from $PORT
     import os
-    app.run_server(host="0.0.0.0", port=int(os.environ.get("PORT", 8050)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8050)))
