@@ -10,22 +10,49 @@ conn = psycopg.connect(
     password="Cdx1L02kII4kMq1tsU5Pr2AVrwW6zRpM",
     port=5432
 )
-cur = conn.cursor()
+
+
+# Create table if it doesn't exist
+with conn.cursor() as cur:
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS temps (
+            id SERIAL PRIMARY KEY,
+            value REAL NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+
 
 # logging endpoint
 @app.route("/log", methods=["GET"])
 def log():
     value = request.args.get("value")
+    if value is None:
+        return jsonify({"error": "no value provided"}), 400
 
-    print(f"Data received: {value}")  # server-side logging
+    with conn.cursor() as cur:
+        cur.execute("INSERT INTO temps (value) VALUES (%s)", (float(value),))
+        conn.commit()
+
+    print(f"Temperature logged: {value}")
     return jsonify({"status": "ok", "value": value})
 
 
 # inspeection output
 @app.route("/print", methods=["GET"])
 def print_msg():
-    print("This is a test message!")
-    return "Printed message on server console!"
+    with conn.cursor() as cur:
+        cur.execute("SELECT value, created_at FROM temps ORDER BY created_at DESC LIMIT 1")
+        row = cur.fetchone()
+
+    if row:
+        value, timestamp = row
+        print(f"Most recent temperature: {value} at {timestamp}")
+        return f"Most recent temperature: {value} at {timestamp}"
+    else:
+        print("No temperature data yet.")
+        return "No temperature data yet."
 
 
 if __name__ == "__main__":
