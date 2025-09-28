@@ -5,7 +5,7 @@ app = Flask(__name__)
 
 conn = psycopg.connect(
     host="dpg-d3cnfeogjchc739bkkq0-a",
-    database="dashpico_logs",
+    dbname="dashpico_logs",
     user="dashpico_logs_user",
     password="Cdx1L02kII4kMq1tsU5Pr2AVrwW6zRpM",
     port=5432
