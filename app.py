@@ -1,5 +1,8 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template_string
 import psycopg
+import os
+import plotly.graph_objs as go
+import plotly.io as pio
 
 app = Flask(__name__)
 
@@ -53,6 +56,54 @@ def print_msg():
     else:
         app.logger.info("No temperature data yet.")
         return "No temperature data yet."
+
+
+@app.route("/graph", methods=["GET"])
+def graph():
+    # Fetch last 100 temperature readings
+    with conn.cursor() as cur:
+        cur.execute("SELECT value, created_at FROM temps ORDER BY created_at DESC LIMIT 100")
+        rows = cur.fetchall()
+
+    if not rows:
+        return "No temperature data yet."
+
+    # Split into lists for plotting
+    rows.reverse()  # oldest first
+    values = [row[0] for row in rows]
+    timestamps = [row[1] for row in rows]
+
+    # Create interactive Plotly figure
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=timestamps, y=values, mode='lines+markers', name='Temperature'))
+    fig.update_layout(
+        title="Temperature over time",
+        xaxis_title="Time",
+        yaxis_title="Temperature (°C)",
+        autosize=True
+    )
+
+    # Render as HTML with auto-refresh (every 10 seconds)
+    graph_html = pio.to_html(fig, full_html=False)
+    html_template = f"""
+    <html>
+        <head>
+            <title>Temperature Graph</title>
+            <script>
+                // Refresh page every 10 seconds
+                setTimeout(function(){{
+                    window.location.reload();
+                }}, 10000);
+            </script>
+        </head>
+        <body>
+            <h1>Temperature Measurements</h1>
+            {graph_html}
+        </body>
+    </html>
+    """
+    return render_template_string(html_template)
+
 
 
 if __name__ == "__main__":
