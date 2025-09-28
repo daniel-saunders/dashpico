@@ -3,7 +3,7 @@ import psycopg
 
 app = Flask(__name__)
 
-conn = psycopg2.connect(
+conn = psycopg.connect(
     host=os.environ["dpg-d3cnfeogjchc739bkkq0-a"],
     database=os.environ["dashpico_logs"],
     user=os.environ["dashpico_logs_user"],
