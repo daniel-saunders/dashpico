@@ -4,11 +4,11 @@ import psycopg
 app = Flask(__name__)
 
 conn = psycopg.connect(
-    host=os.environ["dpg-d3cnfeogjchc739bkkq0-a"],
-    database=os.environ["dashpico_logs"],
-    user=os.environ["dashpico_logs_user"],
-    password=os.environ["Cdx1L02kII4kMq1tsU5Pr2AVrwW6zRpM"],
-    port=os.environ.get("5432", 5432)
+    host="dpg-d3cnfeogjchc739bkkq0-a",
+    database="dashpico_logs",
+    user="dashpico_logs_user",
+    password="Cdx1L02kII4kMq1tsU5Pr2AVrwW6zRpM",
+    port=5432
 )
 cur = conn.cursor()
 
