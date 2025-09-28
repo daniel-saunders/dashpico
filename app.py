@@ -35,7 +35,7 @@ def log():
         cur.execute("INSERT INTO temps (value) VALUES (%s)", (float(value),))
         conn.commit()
 
-    print(f"Temperature logged: {value}")
+    app.logger.info(f"Temperature logged: {value}")
     return jsonify({"status": "ok", "value": value})
 
 
@@ -48,10 +48,10 @@ def print_msg():
 
     if row:
         value, timestamp = row
-        print(f"Most recent temperature: {value} at {timestamp}")
+        app.logger.info(f"Most recent temperature: {value} at {timestamp}")
         return f"Most recent temperature: {value} at {timestamp}"
     else:
-        print("No temperature data yet.")
+        app.logger.info("No temperature data yet.")
         return "No temperature data yet."
 
 
