@@ -98,7 +98,9 @@ def graph():
         </head>
         <body>
             <h1>Temperature Measurements</h1>
+            {{% raw %}}
             {graph_html}
+            {{% endraw %}}
         </body>
     </html>
     """
