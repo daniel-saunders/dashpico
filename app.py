@@ -1,8 +1,9 @@
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, send_file
 import psycopg
 import os
-import pygal
 from datetime import datetime, timedelta
+import plotext as plt
+from io import BytesIO
 
 
 app = Flask(__name__)
@@ -59,14 +60,11 @@ def print_msg():
         return "No temperature data yet."
 
 
-import pygal
-from flask import render_template_string
-
 @app.route("/graph", methods=["GET"])
 def graph():
-    # Fetch last 3600 temperature readings (to cover last 24h)
+    # Fetch last 1000 temperature readings
     with conn.cursor() as cur:
-        cur.execute("SELECT value, created_at FROM temps ORDER BY created_at DESC LIMIT 3600")
+        cur.execute("SELECT value, created_at FROM temps ORDER BY created_at DESC LIMIT 1000")
         rows = cur.fetchall()
 
     if not rows:
@@ -89,54 +87,38 @@ def graph():
     latest_value = values[-1]
     latest_time = timestamps[-1].strftime("%Y-%m-%d %H:%M:%S")
 
-    # Generate x-axis labels every 3 hours
-    # Compute 3-hour boundaries in last 24h
-    start = cutoff.replace(minute=0, second=0, microsecond=0)
-    label_times = [start + timedelta(hours=i*3) for i in range(9)]  # 0h, 3h, ..., 24h
-
-    # Map each timestamp to a label if it's the closest to a 3-hour mark, else empty
-    x_labels = []
-    label_index = 0
+    # Prepare x-axis labels: show every 3 hours
+    x_labels = [ts.strftime("%H:%M") for ts in timestamps]
+    x_ticks = []
+    last_tick_hour = None
     for ts in timestamps:
-        if label_index < len(label_times) and ts >= label_times[label_index]:
-            x_labels.append(label_times[label_index].strftime("%H:%M"))
-            label_index += 1
+        if ts.hour % 3 == 0 and ts.hour != last_tick_hour:
+            x_ticks.append(ts.strftime("%H:%M"))
+            last_tick_hour = ts.hour
         else:
-            x_labels.append('')
+            x_ticks.append("")
 
-    # Create Pygal line chart
-    line_chart = pygal.Line(
-        show_dots=True,
-        show_legend=False,
-        x_label_rotation=45,
-        show_minor_x_labels=False,
-        width=800,
-        height=400,
-        range=(15, 23)
-    )
-    line_chart.title = "Temperature over the last 24 hours"
-    line_chart.x_labels = x_labels
-    line_chart.add("Temperature (°C)", values)
+    # Clear previous plots
+    plt.clf()
 
-    # Render SVG
-    chart_svg = line_chart.render(is_unicode=True)
+    # Plot line chart
+    plt.plot(x_labels, values, marker='dot', color='cyan')
+    plt.ylim(15, 23)
+    plt.title("Temperature over the last 24 hours")
+    plt.xlabel("Time")
+    plt.ylabel("Temperature (°C)")
+    plt.xticks(rotation=45)
+    plt.xlim(x_labels[0], x_labels[-1])
 
-    # Embed SVG in HTML
-    html_template = f"""
-    <html>
-        <head>
-            <title>Temperature Graph</title>
-        </head>
-        <body>
-            <h1>Temperature Measurements</h1>
-            <h2>Latest: {latest_value} °C at {latest_time}</h2>
-            {{% raw %}}
-            {chart_svg}
-            {{% endraw %}}
-        </body>
-    </html>
-    """
-    return render_template_string(html_template)
+    # Save to in-memory PNG
+    buf = BytesIO()
+    plt.canvas_color('default')
+    plt.axes_color('default')
+    plt.ticks_color('white')
+    plt.savefig(buf)
+    buf.seek(0)
+
+    return send_file(buf, mimetype='image/png', download_name="temperature.png")
 
 
 if __name__ == "__main__":
