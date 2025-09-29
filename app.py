@@ -84,8 +84,8 @@ def graph():
     line_chart.add("Temperature (°C)", values)
 
     # Render SVG as string
-    chart_svg = line_chart.render(is_unicode=True).decode("utf-8")
-
+    chart_svg = line_chart.render(is_unicode=True)
+    
     # Embed SVG in HTML, showing latest measurement
     html_template = f"""
     <html>
