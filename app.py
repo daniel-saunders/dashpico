@@ -71,22 +71,33 @@ def graph():
     # Split into lists for plotting
     rows.reverse()  # oldest first
     values = [row[0] for row in rows]
-    timestamps = [row[1].strftime("%H:%M:%S") for row in rows]  # format datetime for axis labels
+    timestamps = [row[1].strftime("%H:%M") for row in rows]  # shorter timestamp
 
-    # Most recent reading (last after reversing)
+    # Most recent reading
     latest_value = values[-1]
     latest_time = rows[-1][1].strftime("%Y-%m-%d %H:%M:%S")
 
+    # Reduce clutter on x-axis by showing every 10th label
+    step = max(1, len(timestamps) // 10)
+    x_labels = [timestamps[i] if i % step == 0 else '' for i in range(len(timestamps))]
+
     # Create Pygal line chart
-    line_chart = pygal.Line(show_dots=True, x_label_rotation=20)
+    line_chart = pygal.Line(
+        show_dots=True,
+        x_label_rotation=45,
+        show_minor_x_labels=False,
+        width=800,
+        height=400,
+        range=(15, 23)
+    )
     line_chart.title = "Temperature over time"
-    line_chart.x_labels = timestamps
+    line_chart.x_labels = x_labels
     line_chart.add("Temperature (°C)", values)
 
     # Render SVG as string
     chart_svg = line_chart.render(is_unicode=True)
-    
-    # Embed SVG in HTML, showing latest measurement
+
+    # Embed SVG in HTML
     html_template = f"""
     <html>
         <head>
