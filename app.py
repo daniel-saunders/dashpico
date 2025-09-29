@@ -70,7 +70,7 @@ def graph():
     if not rows:
         return "No temperature data yet."
 
-    # Filter readings to last 24 hours
+    # Filter last 24 hours
     now = datetime.utcnow()
     cutoff = now - timedelta(hours=24)
     rows = [row for row in rows if row[1] >= cutoff]
@@ -78,37 +78,27 @@ def graph():
     if not rows:
         return "No temperature data in the last 24 hours."
 
-    # Sort oldest first
     rows.sort(key=lambda r: r[1])
     values = [row[0] for row in rows]
     timestamps = [row[1] for row in rows]
 
-    # Latest reading
-    latest_value = values[-1]
-    latest_time = timestamps[-1].strftime("%Y-%m-%d %H:%M:%S")
+    # Convert timestamps to numeric x values (seconds since cutoff)
+    x_values = [(ts - cutoff).total_seconds() for ts in timestamps]
 
-    # Prepare x-axis labels: show every 3 hours
-    x_labels = [ts.strftime("%H:%M") for ts in timestamps]
-    x_ticks = []
-    last_tick_hour = None
-    for ts in timestamps:
-        if ts.hour % 3 == 0 and ts.hour != last_tick_hour:
-            x_ticks.append(ts.strftime("%H:%M"))
-            last_tick_hour = ts.hour
-        else:
-            x_ticks.append("")
+    # Generate x-axis ticks every 3 hours
+    x_ticks = [i*3600*3 for i in range(9)]  # 0h, 3h, 6h, ..., 24h
+    x_labels = [(cutoff + timedelta(seconds=sec)).strftime("%H:%M") for sec in x_ticks]
 
-    # Clear previous plots
+    # Clear previous plot
     plt.clf()
 
-    # Plot line chart
-    plt.plot(x_labels, values, marker='dot', color='cyan')
+    # Plot the data
+    plt.plot(x_values, values, marker='dot', color='cyan')
     plt.ylim(15, 23)
     plt.title("Temperature over the last 24 hours")
     plt.xlabel("Time")
     plt.ylabel("Temperature (°C)")
-    plt.xticks(rotation=45)
-    plt.xlim(x_labels[0], x_labels[-1])
+    plt.xticks(x_ticks, x_labels, rotation=45)
 
     # Save to in-memory PNG
     buf = BytesIO()
