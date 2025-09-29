@@ -2,7 +2,6 @@ from flask import Flask, request, jsonify, render_template_string, send_file
 import psycopg
 import os
 from datetime import datetime, timedelta
-import plotext as plt
 from io import BytesIO
 
 
