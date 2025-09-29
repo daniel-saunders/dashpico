@@ -58,6 +58,9 @@ def print_msg():
         return "No temperature data yet."
 
 
+import pygal
+from flask import render_template_string
+
 @app.route("/graph", methods=["GET"])
 def graph():
     # Fetch last 100 temperature readings
@@ -71,19 +74,24 @@ def graph():
     # Split into lists for plotting
     rows.reverse()  # oldest first
     values = [row[0] for row in rows]
-    timestamps = [row[1].strftime("%H:%M") for row in rows]  # shorter timestamp
+    timestamps = [row[1] for row in rows]  # keep as datetime objects
 
     # Most recent reading
     latest_value = values[-1]
     latest_time = rows[-1][1].strftime("%Y-%m-%d %H:%M:%S")
 
-    # Reduce clutter on x-axis by showing every 10th label
-    step = max(1, len(timestamps) // 10)
-    x_labels = [timestamps[i] if i % step == 0 else '' for i in range(len(timestamps))]
+    # Create x-axis labels: roughly 10 evenly spaced labels
+    num_labels = 10
+    step = max(1, len(timestamps) // num_labels)
+    x_labels = [
+        timestamps[i].strftime("%H:%M") if i % step == 0 else ''
+        for i in range(len(timestamps))
+    ]
 
     # Create Pygal line chart
     line_chart = pygal.Line(
         show_dots=True,
+        show_legend=False,        # turn off legend
         x_label_rotation=45,
         show_minor_x_labels=False,
         width=800,
@@ -113,7 +121,6 @@ def graph():
     </html>
     """
     return render_template_string(html_template)
-
 
 
 if __name__ == "__main__":
