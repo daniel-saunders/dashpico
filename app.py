@@ -1,8 +1,8 @@
 from flask import Flask, request, jsonify, render_template_string
 import psycopg
 import os
-import plotly.graph_objs as go
-import plotly.io as pio
+import pygal
+
 
 app = Flask(__name__)
 
@@ -71,35 +71,32 @@ def graph():
     # Split into lists for plotting
     rows.reverse()  # oldest first
     values = [row[0] for row in rows]
-    timestamps = [row[1] for row in rows]
+    timestamps = [row[1].strftime("%H:%M:%S") for row in rows]  # format datetime for axis labels
 
-    # Create interactive Plotly figure
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=timestamps, y=values, mode='lines+markers', name='Temperature'))
-    fig.update_layout(
-        title="Temperature over time",
-        xaxis_title="Time",
-        yaxis_title="Temperature (°C)",
-        autosize=True
-    )
+    # Most recent reading (last after reversing)
+    latest_value = values[-1]
+    latest_time = rows[-1][1].strftime("%Y-%m-%d %H:%M:%S")
 
-    # Render as HTML with auto-refresh (every 10 seconds)
-    graph_html = pio.to_html(fig, full_html=False)
+    # Create Pygal line chart
+    line_chart = pygal.Line(show_dots=True, x_label_rotation=20)
+    line_chart.title = "Temperature over time"
+    line_chart.x_labels = timestamps
+    line_chart.add("Temperature (°C)", values)
+
+    # Render SVG as string
+    chart_svg = line_chart.render(is_unicode=True).decode("utf-8")
+
+    # Embed SVG in HTML, showing latest measurement
     html_template = f"""
     <html>
         <head>
             <title>Temperature Graph</title>
-            <script>
-                // Refresh page every 10 seconds
-                setTimeout(function(){{
-                    window.location.reload();
-                }}, 10000);
-            </script>
         </head>
         <body>
             <h1>Temperature Measurements</h1>
+            <h2>Latest: {latest_value} °C at {latest_time}</h2>
             {{% raw %}}
-            {graph_html}
+            {chart_svg}
             {{% endraw %}}
         </body>
     </html>
