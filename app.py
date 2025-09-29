@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, render_template_string
 import psycopg
 import os
 import pygal
+from datetime import datetime, timedelta
 
 
 app = Flask(__name__)
