@@ -63,46 +63,61 @@ from flask import render_template_string
 
 @app.route("/graph", methods=["GET"])
 def graph():
-    # Fetch last 100 temperature readings
+    # Fetch last 3600 temperature readings (to cover last 24h)
     with conn.cursor() as cur:
-        cur.execute("SELECT value, created_at FROM temps ORDER BY created_at DESC LIMIT 100")
+        cur.execute("SELECT value, created_at FROM temps ORDER BY created_at DESC LIMIT 3600")
         rows = cur.fetchall()
 
     if not rows:
         return "No temperature data yet."
 
-    # Split into lists for plotting
-    rows.reverse()  # oldest first
+    # Filter readings to last 24 hours
+    now = datetime.utcnow()
+    cutoff = now - timedelta(hours=24)
+    rows = [row for row in rows if row[1] >= cutoff]
+
+    if not rows:
+        return "No temperature data in the last 24 hours."
+
+    # Sort oldest first
+    rows.sort(key=lambda r: r[1])
     values = [row[0] for row in rows]
-    timestamps = [row[1] for row in rows]  # keep as datetime objects
+    timestamps = [row[1] for row in rows]
 
-    # Most recent reading
+    # Latest reading
     latest_value = values[-1]
-    latest_time = rows[-1][1].strftime("%Y-%m-%d %H:%M:%S")
+    latest_time = timestamps[-1].strftime("%Y-%m-%d %H:%M:%S")
 
-    # Create x-axis labels: roughly 10 evenly spaced labels
-    num_labels = 10
-    step = max(1, len(timestamps) // num_labels)
-    x_labels = [
-        timestamps[i].strftime("%H:%M") if i % step == 0 else ''
-        for i in range(len(timestamps))
-    ]
+    # Generate x-axis labels every 3 hours
+    # Compute 3-hour boundaries in last 24h
+    start = cutoff.replace(minute=0, second=0, microsecond=0)
+    label_times = [start + timedelta(hours=i*3) for i in range(9)]  # 0h, 3h, ..., 24h
+
+    # Map each timestamp to a label if it's the closest to a 3-hour mark, else empty
+    x_labels = []
+    label_index = 0
+    for ts in timestamps:
+        if label_index < len(label_times) and ts >= label_times[label_index]:
+            x_labels.append(label_times[label_index].strftime("%H:%M"))
+            label_index += 1
+        else:
+            x_labels.append('')
 
     # Create Pygal line chart
     line_chart = pygal.Line(
         show_dots=True,
-        show_legend=False,        # turn off legend
+        show_legend=False,
         x_label_rotation=45,
         show_minor_x_labels=False,
         width=800,
         height=400,
         range=(15, 23)
     )
-    line_chart.title = "Temperature over time"
+    line_chart.title = "Temperature over the last 24 hours"
     line_chart.x_labels = x_labels
     line_chart.add("Temperature (°C)", values)
 
-    # Render SVG as string
+    # Render SVG
     chart_svg = line_chart.render(is_unicode=True)
 
     # Embed SVG in HTML
