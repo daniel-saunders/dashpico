@@ -60,9 +60,13 @@ def print_msg():
         return "No temperature data yet."
 
 
+from flask import render_template_string
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
+
 @app.route("/graph", methods=["GET"])
 def graph():
-    # Fetch last 1000 temperature readings
+    # Fetch readings
     with conn.cursor() as cur:
         cur.execute("SELECT value, created_at FROM temps ORDER BY created_at DESC LIMIT 1000")
         rows = cur.fetchall()
@@ -73,42 +77,50 @@ def graph():
     # Filter last 24 hours
     now = datetime.utcnow()
     cutoff = now - timedelta(hours=24)
-    rows = [row for row in rows if row[1] >= cutoff]
+    rows = [r for r in rows if r[1] >= cutoff]
 
     if not rows:
         return "No temperature data in the last 24 hours."
 
+    # Sort oldest first
     rows.sort(key=lambda r: r[1])
-    values = [row[0] for row in rows]
-    timestamps = [row[1] for row in rows]
+    values = [r[0] for r in rows]
+    timestamps = [r[1] for r in rows]
 
-    # Convert timestamps to numeric x values (seconds since cutoff)
-    x_values = [(ts - cutoff).total_seconds() for ts in timestamps]
+    # Latest reading
+    latest_value = values[-1]
+    latest_time = timestamps[-1].strftime("%Y-%m-%d %H:%M:%S")
 
-    # Generate x-axis ticks every 3 hours
-    x_ticks = [i*3600*3 for i in range(9)]  # 0h, 3h, 6h, ..., 24h
-    x_labels = [(cutoff + timedelta(seconds=sec)).strftime("%H:%M") for sec in x_ticks]
+    # Create figure
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=timestamps, y=values, mode='lines+markers', name='Temperature'))
 
-    # Clear previous plot
-    plt.clf()
+    # Y-axis fixed
+    fig.update_yaxes(range=[15, 23])
 
-    # Plot the data
-    plt.plot(x_values, values, marker='dot', color='cyan')
-    plt.ylim(15, 23)
-    plt.title("Temperature over the last 24 hours")
-    plt.xlabel("Time")
-    plt.ylabel("Temperature (°C)")
-    plt.xticks(x_ticks, x_labels)
+    # X-axis: 3-hour intervals
+    fig.update_xaxes(
+        dtick=3*3600*1000,  # milliseconds
+        tickformat="%H:%M",
+        tickangle=45
+    )
 
-    # Save to in-memory PNG
-    buf = BytesIO()
-    plt.canvas_color('default')
-    plt.axes_color('default')
-    plt.ticks_color('white')
-    plt.savefig(buf)
-    buf.seek(0)
+    # Hide legend
+    fig.update_layout(showlegend=False, title=f"Temperature over last 24 hours (latest {latest_value} °C at {latest_time})")
 
-    return send_file(buf, mimetype='image/png', download_name="temperature.png")
+    # Render HTML
+    graph_html = fig.to_html(full_html=False)
+    html_template = f"""
+    <html>
+        <head>
+            <title>Temperature Graph</title>
+        </head>
+        <body>
+            {graph_html}
+        </body>
+    </html>
+    """
+    return render_template_string(html_template)
 
 
 if __name__ == "__main__":
