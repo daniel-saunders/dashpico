@@ -98,7 +98,7 @@ def graph():
     plt.title("Temperature over the last 24 hours")
     plt.xlabel("Time")
     plt.ylabel("Temperature (°C)")
-    plt.xticks(x_ticks, x_labels, rotation=45)
+    plt.xticks(x_ticks, x_labels)
 
     # Save to in-memory PNG
     buf = BytesIO()
