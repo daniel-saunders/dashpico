@@ -64,84 +64,166 @@ from flask import render_template_string
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 
-@app.route("/graph", methods=["GET"])
+
+import io
+import base64
+import matplotlib.pyplot as plt
+from flask import render_template_string
+from datetime import datetime, timezone, timedelta
+
 def graph():
     t_start = time.time()
+
     # Fetch readings
     with conn.cursor() as cur:
         cur.execute("""
             WITH ordered AS (
-            SELECT 
-                value,
+                SELECT 
+                    value,
+                    created_at,
+                    ROW_NUMBER() OVER (ORDER BY created_at) AS rn
+                FROM temps
+                ORDER BY created_at DESC
+                LIMIT 10800
+            )
+            SELECT
                 created_at,
-                ROW_NUMBER() OVER (ORDER BY created_at) AS rn
-            FROM temps
-            ORDER BY created_at DESC
-            LIMIT 10800
-        )
-        SELECT
-            created_at,
-            AVG(value) OVER (
-                ORDER BY rn
-                ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
-            ) AS rolling_avg
-        FROM ordered
-        WHERE rn % 10 = 0   -- take every 10th row
-        ORDER BY created_at;
+                AVG(value) OVER (
+                    ORDER BY rn
+                    ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
+                ) AS rolling_avg
+            FROM ordered
+            WHERE rn % 10 = 0
+            ORDER BY created_at;
         """)
         rows = cur.fetchall()
 
-    print(time.time() - t_start)
+    print("Query time:", time.time() - t_start)
     if not rows:
         return "No temperature data yet."
 
-    if not rows:
-        return "No temperature data in the last 24 hours."
-
     # Sort oldest first
     rows.sort(key=lambda r: r[0])
-    values = [r[1] for r in rows]
     timestamps = [r[0] for r in rows]
+    values = [r[1] for r in rows]
 
     # Latest reading
     latest_value = values[-1]
     latest_time = timestamps[-1].strftime("%Y-%m-%d %H:%M:%S")
 
-    # Create figure
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=timestamps, y=values, mode='lines+markers', name='Temperature'))
+    # Create Matplotlib figure
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.plot(timestamps, values, marker='o', linestyle='-', color='tab:blue')
 
-    print(time.time() - t_start)
-    
-    # Y-axis fixed
-    fig.update_yaxes(range=[15, 23])
+    # Fixed Y-axis
+    ax.set_ylim(15, 23)
 
-    # X-axis: 3-hour intervals
-    fig.update_xaxes(
-        dtick=3*3600*1000,  # milliseconds
-        tickformat="%H:%M",
-        tickangle=45
-    )
+    # Format X-axis: 3-hour intervals
+    ax.xaxis.set_major_locator(plt.MaxNLocator(integer=False))
+    ax.set_xlabel("Time")
+    ax.set_ylabel("Temperature (°C)")
+    ax.set_title(f"Temperature over last 24 hours (latest {latest_value} °C at {latest_time})")
 
-    # Hide legend
-    fig.update_layout(showlegend=False, title=f"Temperature over last 24 hours (latest {latest_value} °C at {latest_time})")
+    fig.autofmt_xdate(rotation=45)
+
+    # Save figure to PNG in memory
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', bbox_inches='tight')
+    plt.close(fig)
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
 
     # Render HTML
-    graph_html = fig.to_html(full_html=False)
     html_template = f"""
     <html>
-        <head>
-            <title>Temperature Graph</title>
-        </head>
+        <head><title>Temperature Graph</title></head>
         <body>
-            {graph_html}
+            <img src="data:image/png;base64,{img_base64}" alt="Temperature Graph">
         </body>
     </html>
     """
 
-    print(time.time() - t_start)
-
+    print("Total time:", time.time() - t_start)
     return render_template_string(html_template)
+
+# @app.route("/graph", methods=["GET"])
+# def graph():
+#     t_start = time.time()
+#     # Fetch readings
+#     with conn.cursor() as cur:
+#         cur.execute("""
+#             WITH ordered AS (
+#             SELECT 
+#                 value,
+#                 created_at,
+#                 ROW_NUMBER() OVER (ORDER BY created_at) AS rn
+#             FROM temps
+#             ORDER BY created_at DESC
+#             LIMIT 10800
+#         )
+#         SELECT
+#             created_at,
+#             AVG(value) OVER (
+#                 ORDER BY rn
+#                 ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
+#             ) AS rolling_avg
+#         FROM ordered
+#         WHERE rn % 10 = 0   -- take every 10th row
+#         ORDER BY created_at;
+#         """)
+#         rows = cur.fetchall()
+
+#     print(time.time() - t_start)
+#     if not rows:
+#         return "No temperature data yet."
+
+#     if not rows:
+#         return "No temperature data in the last 24 hours."
+
+#     # Sort oldest first
+#     rows.sort(key=lambda r: r[0])
+#     values = [r[1] for r in rows]
+#     timestamps = [r[0] for r in rows]
+
+#     # Latest reading
+#     latest_value = values[-1]
+#     latest_time = timestamps[-1].strftime("%Y-%m-%d %H:%M:%S")
+
+#     # Create figure
+#     fig = go.Figure()
+#     fig.add_trace(go.Scatter(x=timestamps, y=values, mode='lines+markers', name='Temperature'))
+
+#     print(time.time() - t_start)
+
+#     # Y-axis fixed
+#     fig.update_yaxes(range=[15, 23])
+
+#     # X-axis: 3-hour intervals
+#     fig.update_xaxes(
+#         dtick=3*3600*1000,  # milliseconds
+#         tickformat="%H:%M",
+#         tickangle=45
+#     )
+
+#     # Hide legend
+#     fig.update_layout(showlegend=False, title=f"Temperature over last 24 hours (latest {latest_value} °C at {latest_time})")
+
+#     # Render HTML
+#     graph_html = fig.to_html(full_html=False)
+#     html_template = f"""
+#     <html>
+#         <head>
+#             <title>Temperature Graph</title>
+#         </head>
+#         <body>
+#             {graph_html}
+#         </body>
+#     </html>
+#     """
+
+#     print(time.time() - t_start)
+
+#     return render_template_string(html_template)
 
 
 if __name__ == "__main__":
