@@ -92,18 +92,13 @@ def graph():
     if not rows:
         return "No temperature data yet."
 
-    # Filter last 24 hours
-    now = datetime.utcnow()
-    cutoff = now - timedelta(hours=72)
-    rows = [r for r in rows if r[1] >= cutoff]
-
     if not rows:
         return "No temperature data in the last 24 hours."
 
     # Sort oldest first
     rows.sort(key=lambda r: r[1])
-    values = [r[0] for r in rows]
-    timestamps = [r[1] for r in rows]
+    values = [r[1] for r in rows]
+    timestamps = [r[0] for r in rows]
 
     # Latest reading
     latest_value = values[-1]
