@@ -68,24 +68,35 @@ def graph():
     # Fetch readings
     with conn.cursor() as cur:
         cur.execute("""
-            WITH ordered AS (
-                SELECT 
-                    value,
-                    created_at,
-                    ROW_NUMBER() OVER (ORDER BY created_at) AS rn
-                FROM temps
-                ORDER BY created_at DESC
-                LIMIT 10800
-            )
+            WITH recent AS (
+            SELECT value, created_at
+            FROM temps
+            WHERE created_at >= NOW() - INTERVAL '72 hours'
+            ORDER BY created_at ASC  -- oldest first
+        ),
+        ewma AS (
+            -- base case: first row
             SELECT
                 created_at,
-                AVG(value) OVER (
-                    ORDER BY rn
-                    ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
-                ) AS rolling_avg
-            FROM ordered
-            WHERE rn % 10 = 0
-            ORDER BY created_at;
+                value AS ewma,
+                1 AS rn
+            FROM recent
+            WHERE created_at = (SELECT MIN(created_at) FROM recent)
+
+            UNION ALL
+
+            -- recursive step: next row
+            SELECT
+                r.created_at,
+                0.3 * r.value + 0.7 * e.ewma AS ewma,  -- alpha = 0.3
+                e.rn + 1 AS rn
+            FROM recent r
+            JOIN ewma e ON r.created_at > e.created_at
+        )
+        SELECT created_at, ewma
+        FROM ewma
+        WHERE rn % 10 = 0   -- downsample every 10th row
+        ORDER BY created_at;
         """)
         rows = cur.fetchall()
 
