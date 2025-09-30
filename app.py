@@ -90,10 +90,6 @@ def graph():
     rolling_values = [r[1] for r in rows]
     timestamps = [r[0] for r in rows]
 
-    # Latest reading
-    latest_value = rolling_values[-1]
-    latest_time = timestamps[-1].strftime("%Y-%m-%d %H:%M:%S")
-
     # Also fetch the last 30 actual readings for another trace
     with conn.cursor() as cur:
         cur.execute("""
@@ -108,6 +104,10 @@ def graph():
     last30.sort(key=lambda r: r[1])
     last30_values = [r[0] for r in last30]
     last30_times = [r[1] for r in last30]
+
+    # Latest reading
+    latest_value = last30_values[-1]
+    latest_time = last30_times[-1].strftime("%Y-%m-%d %H:%M:%S")
 
     # Create figure
     fig = go.Figure()
