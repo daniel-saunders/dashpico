@@ -67,7 +67,26 @@ from datetime import datetime, timedelta
 def graph():
     # Fetch readings
     with conn.cursor() as cur:
-        cur.execute("SELECT value, created_at FROM temps ORDER BY created_at DESC LIMIT 10800")
+        cur.execute("
+            WITH ordered AS (
+            SELECT 
+                value,
+                created_at,
+                ROW_NUMBER() OVER (ORDER BY created_at) AS rn
+            FROM temps
+            ORDER BY created_at DESC
+            LIMIT 10800
+        )
+        SELECT
+            created_at,
+            AVG(value) OVER (
+                ORDER BY rn
+                ROWS BETWEEN 9 PRECEDING AND CURRENT ROW
+            ) AS rolling_avg
+        FROM ordered
+        WHERE rn % 10 = 0   -- take every 10th row
+        ORDER BY created_at;
+        ")
         rows = cur.fetchall()
 
     if not rows:
