@@ -71,6 +71,7 @@ import matplotlib.pyplot as plt
 from flask import render_template_string
 from datetime import datetime, timezone, timedelta
 
+@app.route("/graph", methods=["GET"])
 def graph():
     t_start = time.time()
 
