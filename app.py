@@ -67,7 +67,7 @@ from datetime import datetime, timedelta
 def graph():
     # Fetch readings
     with conn.cursor() as cur:
-        cur.execute("
+        cur.execute("""
             WITH ordered AS (
             SELECT 
                 value,
@@ -86,7 +86,7 @@ def graph():
         FROM ordered
         WHERE rn % 10 = 0   -- take every 10th row
         ORDER BY created_at;
-        ")
+        """)
         rows = cur.fetchall()
 
     if not rows:
