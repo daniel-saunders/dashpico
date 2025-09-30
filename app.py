@@ -67,7 +67,7 @@ from datetime import datetime, timedelta
 def graph():
     # Fetch readings
     with conn.cursor() as cur:
-        cur.execute("SELECT value, created_at FROM temps ORDER BY created_at DESC LIMIT 1000")
+        cur.execute("SELECT value, created_at FROM temps ORDER BY created_at DESC LIMIT 10800")
         rows = cur.fetchall()
 
     if not rows:
@@ -75,7 +75,7 @@ def graph():
 
     # Filter last 24 hours
     now = datetime.utcnow()
-    cutoff = now - timedelta(hours=24)
+    cutoff = now - timedelta(hours=72)
     rows = [r for r in rows if r[1] >= cutoff]
 
     if not rows:
