@@ -96,7 +96,7 @@ def graph():
         return "No temperature data in the last 24 hours."
 
     # Sort oldest first
-    rows.sort(key=lambda r: r[1])
+    rows.sort(key=lambda r: r[0])
     values = [r[1] for r in rows]
     timestamps = [r[0] for r in rows]
 
