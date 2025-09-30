@@ -3,6 +3,7 @@ import psycopg
 import os
 from datetime import datetime, timedelta
 from io import BytesIO
+import time
 
 
 app = Flask(__name__)
@@ -65,6 +66,7 @@ from datetime import datetime, timedelta
 
 @app.route("/graph", methods=["GET"])
 def graph():
+    t_start = time.time()
     # Fetch readings
     with conn.cursor() as cur:
         cur.execute("""
@@ -89,6 +91,7 @@ def graph():
         """)
         rows = cur.fetchall()
 
+    print(time.time() - t_start)
     if not rows:
         return "No temperature data yet."
 
@@ -108,6 +111,8 @@ def graph():
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=timestamps, y=values, mode='lines+markers', name='Temperature'))
 
+    print(time.time() - t_start)
+    
     # Y-axis fixed
     fig.update_yaxes(range=[15, 23])
 
@@ -133,6 +138,9 @@ def graph():
         </body>
     </html>
     """
+
+    print(time.time() - t_start)
+
     return render_template_string(html_template)
 
 
