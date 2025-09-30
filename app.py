@@ -71,21 +71,28 @@ import matplotlib.pyplot as plt
 from flask import render_template_string
 from datetime import datetime, timezone, timedelta
 
+from flask import render_template_string
+import json
+
+
 @app.route("/graph", methods=["GET"])
 def graph():
-    t_start = time.time()
-
-    # Fetch readings
+    # Fetch optimized rolling average + downsampled points
     with conn.cursor() as cur:
         cur.execute("""
-            WITH ordered AS (
-                SELECT 
+            WITH recent AS (
+                SELECT value, created_at
+                FROM temps
+                WHERE created_at >= NOW() - INTERVAL '72 hours'
+                ORDER BY created_at DESC
+                LIMIT 10800
+            ),
+            ordered AS (
+                SELECT
                     value,
                     created_at,
                     ROW_NUMBER() OVER (ORDER BY created_at) AS rn
-                FROM temps
-                ORDER BY created_at DESC
-                LIMIT 10800
+                FROM recent
             )
             SELECT
                 created_at,
@@ -99,52 +106,55 @@ def graph():
         """)
         rows = cur.fetchall()
 
-    print("Query time:", time.time() - t_start)
     if not rows:
         return "No temperature data yet."
 
-    # Sort oldest first
-    rows.sort(key=lambda r: r[0])
-    timestamps = [r[0] for r in rows]
-    values = [r[1] for r in rows]
+    # Convert timestamps to milliseconds for uPlot
+    timestamps = [int(r[0].timestamp() * 1000) for r in rows]  # x-axis
+    values = [r[1] for r in rows]  # y-axis
 
-    # Latest reading
+    # Latest reading for title
     latest_value = values[-1]
-    latest_time = timestamps[-1].strftime("%Y-%m-%d %H:%M:%S")
+    latest_time = rows[-1][0].strftime("%Y-%m-%d %H:%M:%S")
 
-    # Create Matplotlib figure
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.plot(timestamps, values, marker='o', linestyle='-', color='tab:blue')
+    # Pack data into uPlot format: [x-values, y-values]
+    data = [timestamps, values]
 
-    # Fixed Y-axis
-    ax.set_ylim(15, 23)
-
-    # Format X-axis: 3-hour intervals
-    ax.xaxis.set_major_locator(plt.MaxNLocator(integer=False))
-    ax.set_xlabel("Time")
-    ax.set_ylabel("Temperature (°C)")
-    ax.set_title(f"Temperature over last 24 hours (latest {latest_value} °C at {latest_time})")
-
-    fig.autofmt_xdate(rotation=45)
-
-    # Save figure to PNG in memory
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight')
-    plt.close(fig)
-    buf.seek(0)
-    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
-
-    # Render HTML
     html_template = f"""
     <html>
-        <head><title>Temperature Graph</title></head>
-        <body>
-            <img src="data:image/png;base64,{img_base64}" alt="Temperature Graph">
-        </body>
+    <head>
+        <link rel="stylesheet" href="https://unpkg.com/uplot@1.7.15/dist/uPlot.min.css">
+        <script src="https://unpkg.com/uplot@1.7.15/dist/uPlot.iife.min.js"></script>
+    </head>
+    <body>
+        <div id="chart" style="width:900px; height:400px;"></div>
+        <script>
+            const data = {json.dumps(data)};
+
+            const opts = {{
+                title: "Temperature over last 72 hours (latest {latest_value} °C at {latest_time})",
+                width: 900,
+                height: 400,
+                scales: {{
+                    x: {{ time: true }},
+                    y: {{ min: 15, max: 23 }}
+                }},
+                series: [
+                    {{ label: "Time" }},
+                    {{ label: "Temperature", stroke: "blue", fill: "rgba(135,206,250,0.2)" }}
+                ],
+                axes: [
+                    {{ stroke: "#888" }},
+                    {{ stroke: "#888" }}
+                ]
+            }};
+
+            new uPlot(opts, data, document.getElementById('chart'));
+        </script>
+    </body>
     </html>
     """
 
-    print("Total time:", time.time() - t_start)
     return render_template_string(html_template)
 
 # @app.route("/graph", methods=["GET"])
